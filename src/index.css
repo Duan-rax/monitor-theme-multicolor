@@ -28,24 +28,28 @@
   --muted-foreground: oklch(0.52 0 0);
   --accent: oklch(0.955 0 0);
   --accent-foreground: oklch(0.18 0 0);
-  --destructive: oklch(0.3 0 0);
+  --destructive: oklch(0.58 0.22 25);
   --border: oklch(0.9 0 0);
   --input: oklch(0.9 0 0);
   --ring: oklch(0.62 0 0);
-  --chart-1: oklch(0.3 0 0);
-  --chart-2: oklch(0.45 0 0);
-  --chart-3: oklch(0.58 0 0);
-  --chart-4: oklch(0.7 0 0);
-  --chart-5: oklch(0.82 0 0);
-  /* Greyscale has no red or amber, so severity is carried by weight: the bar
-     darkens as it fills. */
-  --ok: oklch(0.62 0 0);
-  --warn: oklch(0.44 0 0);
+  --chart-1: oklch(0.57 0.22 285);
+  --chart-2: oklch(0.61 0.16 235);
+  --chart-3: oklch(0.7 0.17 70);
+  --chart-4: oklch(0.62 0.17 150);
+  --chart-5: oklch(0.62 0.2 335);
+  --ok: oklch(0.58 0.17 150);
+  --warn: oklch(0.67 0.17 75);
+  --cpu: oklch(0.57 0.22 285);
+  --memory: oklch(0.61 0.16 235);
+  --disk: oklch(0.7 0.17 70);
+  --traffic: oklch(0.58 0.17 150);
+  --download: oklch(0.61 0.16 235);
+  --upload: oklch(0.57 0.22 285);
   /* The status dot. Each clears 3:1 against the card (3.7 and 5.5), and 1.5:1
      against the other, the separation red-green colour blindness still
      perceives. */
   --online: oklch(0.6 0.16 150);
-  --offline: oklch(0.52 0 0);
+  --offline: oklch(0.58 0.22 25);
 }
 
 .dark {
@@ -63,22 +67,27 @@
   --muted-foreground: oklch(0.7 0 0);
   --accent: oklch(0.27 0 0);
   --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.95 0 0);
+  --destructive: oklch(0.72 0.2 25);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.55 0 0);
-  --chart-1: oklch(0.95 0 0);
-  --chart-2: oklch(0.82 0 0);
-  --chart-3: oklch(0.68 0 0);
-  --chart-4: oklch(0.54 0 0);
-  --chart-5: oklch(0.42 0 0);
-  /* Inverted against the dark ground: the fuller the bar, the brighter. */
-  --ok: oklch(0.62 0 0);
-  --warn: oklch(0.79 0 0);
+  --chart-1: oklch(0.74 0.19 285);
+  --chart-2: oklch(0.75 0.14 235);
+  --chart-3: oklch(0.8 0.16 75);
+  --chart-4: oklch(0.72 0.17 150);
+  --chart-5: oklch(0.74 0.18 335);
+  --ok: oklch(0.72 0.17 150);
+  --warn: oklch(0.8 0.16 75);
+  --cpu: oklch(0.74 0.19 285);
+  --memory: oklch(0.75 0.14 235);
+  --disk: oklch(0.8 0.16 75);
+  --traffic: oklch(0.72 0.17 150);
+  --download: oklch(0.75 0.14 235);
+  --upload: oklch(0.74 0.19 285);
   /* 7.8 and 3.7 against the card, 2.1 apart. The muted grey would sit 1.15 from
      the green. */
   --online: oklch(0.72 0.17 150);
-  --offline: oklch(0.55 0 0);
+  --offline: oklch(0.72 0.2 25);
 }
 
 @theme inline {
@@ -113,6 +122,12 @@
   --color-warn: var(--warn);
   --color-online: var(--online);
   --color-offline: var(--offline);
+  --color-cpu: var(--cpu);
+  --color-memory: var(--memory);
+  --color-disk: var(--disk);
+  --color-traffic: var(--traffic);
+  --color-download: var(--download);
+  --color-upload: var(--upload);
 }
 
 @layer base {
