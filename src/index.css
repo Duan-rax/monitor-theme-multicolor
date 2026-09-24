@@ -45,6 +45,10 @@
   --traffic: oklch(0.58 0.17 150);
   --download: oklch(0.61 0.16 235);
   --upload: oklch(0.57 0.22 285);
+  --health: oklch(0.58 0.17 150);
+  --load: oklch(0.61 0.16 235);
+  --severe: oklch(0.67 0.2 55);
+  --danger: oklch(0.58 0.22 25);
   /* The status dot. Each clears 3:1 against the card (3.7 and 5.5), and 1.5:1
      against the other, the separation red-green colour blindness still
      perceives. */
@@ -84,6 +88,10 @@
   --traffic: oklch(0.72 0.17 150);
   --download: oklch(0.75 0.14 235);
   --upload: oklch(0.74 0.19 285);
+  --health: oklch(0.72 0.17 150);
+  --load: oklch(0.75 0.14 235);
+  --severe: oklch(0.76 0.19 55);
+  --danger: oklch(0.72 0.2 25);
   /* 7.8 and 3.7 against the card, 2.1 apart. The muted grey would sit 1.15 from
      the green. */
   --online: oklch(0.72 0.17 150);
@@ -128,6 +136,10 @@
   --color-traffic: var(--traffic);
   --color-download: var(--download);
   --color-upload: var(--upload);
+  --color-health: var(--health);
+  --color-load: var(--load);
+  --color-severe: var(--severe);
+  --color-danger: var(--danger);
 }
 
 @layer base {
