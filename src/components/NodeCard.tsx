@@ -71,7 +71,7 @@ function deployed(node: Node) {
 export function Status({ node }: { node: Node }) {
   const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
   const label = node.online
-    ? `在线 ${node.metrics ? uptime(node.metrics.uptime) : ""}`
+    ? `在线 ${node.metrics ? uptime(node.metrics.uptime, true) : ""}`
     : deployed(node)
       ? `离线 ${down >= 60 ? uptime(down) : ""}`
       : "未接入"
@@ -216,26 +216,22 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               label={`CPU ${node.cpu_cores} 核`}
               pct={m ? m.cpu : null}
               foot={m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}
-              tone="cpu"
             />
             <Meter
               label="内存"
               pct={m ? percent(m.mem_used, m.mem_total) : null}
               foot={m ? pair(m.mem_used, m.mem_total) : bytes(node.mem_total)}
-              tone="memory"
             />
             <Meter
               label="硬盘"
               pct={m ? percent(m.disk_used, m.disk_total) : null}
               foot={m ? pair(m.disk_used, m.disk_total) : bytes(node.disk_total)}
-              tone="disk"
             />
             <Meter
               label="流量"
               pct={node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null}
               empty={FOREVER}
               foot={trafficFoot(node)}
-              tone="traffic"
             />
           </div>
 
