@@ -1,17 +1,21 @@
-import { Activity, ArrowDown, ArrowDownUp, ArrowUp, Gauge, Server } from "lucide-react"
+import { useEffect, useState } from "react"
+import { ArrowDown, ArrowDownUp, ArrowUp, Gauge, Server, WalletCards } from "lucide-react"
 
 import { Card } from "@/components/ui/card"
 import { speedHistory, type Node } from "@/lib/api"
 import { bytes, rate } from "@/lib/format"
+import {
+  fetchUsdRates, FX_CACHE_TTL, readFxCache, remainingCny, type FxSnapshot, writeFxCache,
+} from "@/lib/fx"
 import { cn } from "@/lib/utils"
 
-function Tile({ icon: Icon, label, children }: {
-  icon: typeof Server; label: string; children: React.ReactNode
+function Tile({ icon: Icon, label, tone, children }: {
+  icon: typeof Server; label: string; tone: string; children: React.ReactNode
 }) {
   return (
     <Card className="gap-0 p-3">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="size-3.5" />
+        <Icon className={cn("size-3.5", tone)} />
         {label}
       </div>
       {children}
@@ -28,11 +32,11 @@ function Flow({ down, up, className }: { down: string; up: string; className?: s
   return (
     <div className={cn("tnum grid grid-cols-1 gap-x-2 sm:grid-cols-2", className)}>
       <span className="inline-flex items-center gap-1">
-        <ArrowDown className="size-3 shrink-0 text-muted-foreground" />
+        <ArrowDown className="size-3 shrink-0 text-download" />
         {down}
       </span>
       <span className="inline-flex items-center gap-1">
-        <ArrowUp className="size-3 shrink-0 text-muted-foreground" />
+        <ArrowUp className="size-3 shrink-0 text-upload" />
         {up}
       </span>
     </div>
@@ -68,14 +72,30 @@ function Spark({ series }: { series: { values: number[]; className: string }[] }
 export function Summary({ nodes, group }: { nodes: Node[]; group: string | null }) {
   const online = nodes.filter((n) => n.online)
   const sum = (pick: (n: Node) => number) => nodes.reduce((total, n) => total + pick(n), 0)
+  const [fx, setFx] = useState<FxSnapshot | null>(() => readFxCache())
+  const [fxFailed, setFxFailed] = useState(false)
 
-  // The busiest node rather than the average: one machine at 95% is what matters,
-  // and a fleet of idle ones would average it away.
-  const busiest = online.reduce<Node | null>(
-    (top, n) => (n.metrics && (!top || n.metrics.cpu > top.metrics!.cpu) ? n : top),
-    null,
-  )
-  const cpu = busiest?.metrics?.cpu ?? 0
+  useEffect(() => {
+    if (fx && Date.now() - fx.savedAt < FX_CACHE_TTL) return
+    const controller = new AbortController()
+    fetchUsdRates(controller.signal)
+      .then((snapshot) => {
+        setFx(snapshot)
+        setFxFailed(false)
+        writeFxCache(snapshot)
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setFxFailed(true)
+      })
+    return () => controller.abort()
+  }, [fx])
+
+  const values = fx ? nodes.map((node) => remainingCny(node, fx.rates)).filter((value): value is number => value !== null) : []
+  const remaining = values.reduce((total, value) => total + value, 0)
+  const cny = new Intl.NumberFormat("zh-CN", {
+    style: "currency", currency: "CNY", maximumFractionDigits: remaining >= 1000 ? 0 : 2,
+  }).format(remaining)
   // The same push produced `nodes` and this sample, so the figure above the line
   // is that line's last point.
   const history = speedHistory.get(group) ?? []
@@ -83,7 +103,7 @@ export function Summary({ nodes, group }: { nodes: Node[]; group: string | null 
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Tile icon={Server} label="节点">
+      <Tile icon={Server} label="节点" tone={online.length === nodes.length ? "text-online" : "text-warn"}>
         <div className="tnum mt-1 text-xl font-semibold">
           {online.length} / {nodes.length}
         </div>
@@ -92,14 +112,14 @@ export function Summary({ nodes, group }: { nodes: Node[]; group: string | null 
         </div>
       </Tile>
 
-      <Tile icon={Activity} label="最忙节点">
-        <div className="tnum mt-1 text-xl font-semibold">{busiest ? `${cpu.toFixed(1)}%` : "—"}</div>
-        <div className={cn("mt-auto truncate pt-1 text-xs", cpu >= 85 ? "font-medium text-foreground" : "text-muted-foreground")}>
-          {busiest ? busiest.name : "无在线节点"}
+      <Tile icon={WalletCards} label="剩余价值" tone="text-disk">
+        <div className="tnum mt-1 text-xl font-semibold text-disk">{fx ? cny : "—"}</div>
+        <div className="mt-auto truncate pt-1 text-xs text-muted-foreground">
+          {fx ? `${values.length} 台计价 · 汇率 ${fx.date.slice(5)}` : fxFailed ? "汇率暂不可用" : "正在获取人民币汇率"}
         </div>
       </Tile>
 
-      <Tile icon={ArrowDownUp} label="今日流量">
+      <Tile icon={ArrowDownUp} label="今日流量" tone="text-traffic">
         <Flow
           down={bytes(sum((n) => n.day_rx))}
           up={bytes(sum((n) => n.day_tx))}
@@ -109,13 +129,13 @@ export function Summary({ nodes, group }: { nodes: Node[]; group: string | null 
         <Flow down={bytes(sum((n) => n.total_rx))} up={bytes(sum((n) => n.total_tx))} className="mt-0.5 text-sm" />
       </Tile>
 
-      <Tile icon={Gauge} label="实时网速">
+      <Tile icon={Gauge} label="实时网速" tone="text-memory">
         <Flow down={rate(now.rx)} up={rate(now.tx)} className="mt-1 text-sm font-semibold" />
         <div className="mt-auto pt-1">
           <Spark
             series={[
-              { values: history.map((s) => s.rx), className: "text-foreground" },
-              { values: history.map((s) => s.tx), className: "text-muted-foreground" },
+              { values: history.map((s) => s.rx), className: "text-download" },
+              { values: history.map((s) => s.tx), className: "text-upload" },
             ]}
           />
         </div>

@@ -80,12 +80,19 @@ export function Status({ node }: { node: Node }) {
     // no longer current.
     <Badge
       variant="outline"
-      className={cn("tnum shrink-0 gap-1.5 font-normal", !node.online && "text-muted-foreground")}
+      className={cn(
+        "tnum shrink-0 gap-1.5 font-normal",
+        node.online
+          ? "border-online/30 bg-online/10 text-online"
+          : deployed(node)
+            ? "border-destructive/30 bg-destructive/10 text-destructive"
+            : "text-muted-foreground",
+      )}
     >
       <span
         className={cn(
           "size-1.5 rounded-full",
-          node.online ? "bg-online" : deployed(node) ? "bg-offline" : "bg-muted-foreground/40",
+          node.online ? "bg-online" : deployed(node) ? "bg-destructive" : "bg-muted-foreground/40",
         )}
       />
       {label.trim()}
@@ -167,7 +174,10 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
       // OS line below does not wrap, so on a phone the card would grow past its
       // column and scroll the page sideways. The truncate inside only takes effect
       // once the card is allowed to be narrower.
-      className="min-w-0 cursor-pointer gap-0 p-4 transition-colors hover:border-ring"
+      className={cn(
+        "min-w-0 cursor-pointer gap-0 p-4 transition-colors",
+        node.online ? "hover:border-online/50" : deployed(node) ? "border-destructive/20 hover:border-destructive/50" : "hover:border-ring",
+      )}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onOpen())}
@@ -206,40 +216,44 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               label={`CPU ${node.cpu_cores} 核`}
               pct={m ? m.cpu : null}
               foot={m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}
+              tone="cpu"
             />
             <Meter
               label="内存"
               pct={m ? percent(m.mem_used, m.mem_total) : null}
               foot={m ? pair(m.mem_used, m.mem_total) : bytes(node.mem_total)}
+              tone="memory"
             />
             <Meter
               label="硬盘"
               pct={m ? percent(m.disk_used, m.disk_total) : null}
               foot={m ? pair(m.disk_used, m.disk_total) : bytes(node.disk_total)}
+              tone="disk"
             />
             <Meter
               label="流量"
               pct={node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null}
               empty={FOREVER}
               foot={trafficFoot(node)}
+              tone="traffic"
             />
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t pt-4 text-xs">
             <span className="tnum inline-flex items-center gap-1.5">
-              <ArrowDown className="size-3 text-muted-foreground" />
+              <ArrowDown className="size-3 text-download" />
               {m ? rate(m.net_rx) : "—"}
             </span>
             <span className="tnum inline-flex items-center gap-1.5">
-              <ArrowUp className="size-3 text-muted-foreground" />
+              <ArrowUp className="size-3 text-upload" />
               {m ? rate(m.net_tx) : "—"}
             </span>
             <span className="tnum inline-flex items-center gap-1.5 text-muted-foreground">
-              <ArrowDown className="size-3" />
+              <ArrowDown className="size-3 text-download" />
               {bytes(node.total_rx)}
             </span>
             <span className="tnum inline-flex items-center gap-1.5 text-muted-foreground">
-              <ArrowUp className="size-3" />
+              <ArrowUp className="size-3 text-upload" />
               {bytes(node.total_tx)}
             </span>
           </div>
