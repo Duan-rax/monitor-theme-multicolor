@@ -68,10 +68,15 @@ function deployed(node: Node) {
  * has been absent -- the first question asked of an offline node. Both are
  * durations, so the badge keeps its shape either way.
  */
-export function Status({ node }: { node: Node }) {
+function compactUptime(seconds: number) {
+  const days = Math.floor(seconds / 86_400)
+  return days >= 1 ? `${days} 天` : uptime(seconds)
+}
+
+export function Status({ node, compact = false }: { node: Node; compact?: boolean }) {
   const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
   const label = node.online
-    ? `在线 ${node.metrics ? uptime(node.metrics.uptime) : ""}`
+    ? `在线 ${node.metrics ? compact ? compactUptime(node.metrics.uptime) : uptime(node.metrics.uptime) : ""}`
     : deployed(node)
       ? `离线 ${down >= 60 ? uptime(down) : ""}`
       : "未接入"
@@ -199,7 +204,7 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
         </div>
         {/* State right, identity left, one line each. */}
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <Status node={node} />
+          <Status node={node} compact />
           <Expiry node={node} />
         </div>
       </div>
