@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { healthLevel, type HealthLevel } from "@/lib/health"
 
-type Props = { label: ReactNode; pct: number | null; foot: ReactNode; empty?: ReactNode }
+type Props = { label: ReactNode; pct: number | null; foot: ReactNode; empty?: ReactNode; level?: HealthLevel }
 
 const LEVELS: Record<HealthLevel, { bar: string; text: string; label: string }> = {
   healthy: { bar: "bg-health", text: "text-health", label: "健康" },
@@ -16,12 +16,12 @@ const LEVELS: Record<HealthLevel, { bar: string; text: string; label: string }> 
  * underneath. The colour is a shared health scale across every percentage:
  * healthy < 60, load < 75, severe < 90, danger >= 90.
  */
-export function Meter({ label, pct, foot, empty = "—" }: Props) {
+export function Meter({ label, pct, foot, empty = "—", level: forcedLevel }: Props) {
   // null means the metric has no ceiling to fill, so the bar stays empty rather
   // than reporting 0%. What replaces the percentage depends on the reason:
   // unknown for a node with no metrics, ∞ for a plan with no limit.
   const filled = pct === null ? 0 : Math.min(100, Math.max(0, pct))
-  const level = LEVELS[healthLevel(filled)]
+  const level = LEVELS[forcedLevel ?? healthLevel(filled)]
   return (
     <div className="min-w-0" title={pct === null ? undefined : `${level.label} · ${filled.toFixed(1)}%`}>
       <div className="flex items-baseline justify-between gap-2">

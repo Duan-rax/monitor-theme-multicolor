@@ -237,6 +237,19 @@ function NodeList({ nodes, group, onGroup, onOpen }: {
         </div>
       )}
       <Summary nodes={shown} group={current} />
+      {shown.length > 0 && (
+        <div
+          aria-label="负载等级说明"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card/70 px-3 py-2 text-xs text-muted-foreground"
+        >
+          <span className="font-medium text-foreground">负载等级</span>
+          <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-health" />健康 &lt;60%</span>
+          <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-load" />负载 60–74%</span>
+          <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-severe" />严重 75–89%</span>
+          <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-danger" />危险 ≥90%</span>
+          <span className="ml-auto">按 CPU、负载、内存、硬盘、流量中的最高等级着色</span>
+        </div>
+      )}
       {nodes.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">还没有节点</p>
       ) : (

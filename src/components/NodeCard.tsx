@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card"
 import { Meter } from "@/components/Meter"
 import type { Node } from "@/lib/api"
 import { bytes, daysUntil, FOREVER, osName, pair, percent, rate, uptime } from "@/lib/format"
+import { loadPercent, worstHealth, type HealthLevel } from "@/lib/health"
 import { cn } from "@/lib/utils"
 
 // Emitted as files and fetched on first use, so a page carries only the flags its
@@ -63,6 +64,28 @@ function deployed(node: Node) {
   return node.cpu_cores > 0 || node.mem_total > 0
 }
 
+const CARD_LEVELS: Record<HealthLevel, { card: string; badge: string; label: string }> = {
+  healthy: {
+    card: "border-health/35 bg-health/[0.035] hover:border-health/60",
+    badge: "border-health/35 bg-health/10 text-health",
+    label: "健康",
+  },
+  load: {
+    card: "border-load/40 bg-load/[0.05] hover:border-load/65",
+    badge: "border-load/40 bg-load/10 text-load",
+    label: "负载",
+  },
+  severe: {
+    card: "border-severe/45 bg-severe/[0.06] hover:border-severe/70",
+    badge: "border-severe/40 bg-severe/10 text-severe",
+    label: "严重",
+  },
+  danger: {
+    card: "border-danger/50 bg-danger/[0.075] hover:border-danger/75",
+    badge: "border-danger/45 bg-danger/10 text-danger",
+    label: "危险",
+  },
+}
 /**
  * The dot plus how long the machine has been up, or once it is gone, how long it
  * has been absent -- the first question asked of an offline node. Both are
@@ -71,7 +94,7 @@ function deployed(node: Node) {
 export function Status({ node }: { node: Node }) {
   const down = node.last_seen ? Date.now() / 1000 - node.last_seen : 0
   const label = node.online
-    ? `在线 ${node.metrics ? uptime(node.metrics.uptime, true) : ""}`
+    ? `在线 ${node.metrics ? uptime(node.metrics.uptime) : ""}`
     : deployed(node)
       ? `离线 ${down >= 60 ? uptime(down) : ""}`
       : "未接入"
@@ -166,7 +189,13 @@ function Expiry({ node }: { node: Node }) {
 
 export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
   const m = node.metrics
-
+  const memoryPct = m ? percent(m.mem_used, m.mem_total) : null
+  const diskPct = m ? percent(m.disk_used, m.disk_total) : null
+  const trafficPct = node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null
+  const loadPct = m ? loadPercent(m.load[0], node.cpu_cores) : null
+  const level = node.online && m
+    ? worstHealth([m.cpu, loadPct, memoryPct, diskPct, trafficPct])
+    : null
   return (
     <Card
       onClick={onOpen}
@@ -175,8 +204,15 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
       // column and scroll the page sideways. The truncate inside only takes effect
       // once the card is allowed to be narrower.
       className={cn(
-        "min-w-0 cursor-pointer gap-0 p-4 transition-colors",
-        node.online ? "hover:border-online/50" : deployed(node) ? "border-destructive/20 hover:border-destructive/50" : "hover:border-ring",
+        "relative min-w-0 cursor-pointer gap-0 overflow-hidden border-l-4 p-4 transition-[border-color,background-color,box-shadow,transform]",
+        level
+          ? CARD_LEVELS[level].card
+          : node.online
+            ? "hover:border-online/50"
+            : deployed(node)
+              ? "border-destructive/35 bg-destructive/[0.035] hover:border-destructive/60"
+              : "border-muted-foreground/20 hover:border-ring",
+        "hover:-translate-y-0.5 hover:shadow-md",
       )}
       role="button"
       tabIndex={0}
@@ -187,6 +223,11 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
           <div className="flex min-w-0 items-center gap-1.5">
             <h3 className="truncate font-medium">{node.name}</h3>
             <Country node={node} />
+            {level && (
+              <Badge variant="outline" className={cn("px-1.5 py-0 text-[10px] font-medium", CARD_LEVELS[level].badge)}>
+                {CARD_LEVELS[level].label}
+              </Badge>
+            )}
           </div>
           <p className="mt-1 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             {node.os && <OsIcon os={node.os} />}
@@ -216,20 +257,21 @@ export function NodeCard({ node, onOpen }: { node: Node; onOpen: () => void }) {
               label={`CPU ${node.cpu_cores} 核`}
               pct={m ? m.cpu : null}
               foot={m ? m.load.map((n) => n.toFixed(2)).join(" ") : "—"}
+              level={m ? worstHealth([m.cpu, loadPct]) : undefined}
             />
             <Meter
               label="内存"
-              pct={m ? percent(m.mem_used, m.mem_total) : null}
+              pct={memoryPct}
               foot={m ? pair(m.mem_used, m.mem_total) : bytes(node.mem_total)}
             />
             <Meter
               label="硬盘"
-              pct={m ? percent(m.disk_used, m.disk_total) : null}
+              pct={diskPct}
               foot={m ? pair(m.disk_used, m.disk_total) : bytes(node.disk_total)}
             />
             <Meter
               label="流量"
-              pct={node.traffic_limit > 0 ? percent(monthUsage(node), node.traffic_limit) : null}
+              pct={trafficPct}
               empty={FOREVER}
               foot={trafficFoot(node)}
             />

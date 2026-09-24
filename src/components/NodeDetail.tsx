@@ -71,11 +71,11 @@ const Y_WIDTH = 68
 // Packet loss is reported separately in the legend; a dotted line must not look
 // like another loss signal.
 const PALETTE = [
-  { stroke: "var(--color-chart-1)", dash: undefined },
-  { stroke: "var(--color-chart-3)", dash: undefined },
-  { stroke: "var(--color-chart-2)", dash: undefined },
-  { stroke: "var(--color-chart-4)", dash: undefined },
-  { stroke: "var(--color-chart-5)", dash: undefined },
+  "var(--color-chart-1)",
+  "var(--color-chart-3)",
+  "var(--color-chart-2)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
 ]
 
 const TABS = [
@@ -240,7 +240,7 @@ export function NodeDetail({ node }: { node: Node }) {
     [pingSeries, hiddenProbes],
   )
   // Keyed on the full list, so a line keeps its shade when others are hidden.
-  const style = (id: number) => PALETTE[pingSeries.findIndex((p) => p.id === id) % PALETTE.length]
+  const color = (id: number) => PALETTE[pingSeries.findIndex((probe) => probe.id === id) % PALETTE.length]
 
   // The hub stamps every sample with its bucket rather than the second the probe
   // finished, so probes reporting at the bucket's rate share rows instead of each
@@ -466,12 +466,13 @@ export function NodeDetail({ node }: { node: Node }) {
                           key={`band${s.id}`}
                           dataKey={`${smooth ? "c" : "b"}${s.id}`}
                           stroke="none"
-                          fill={style(s.id).stroke}
+                          fill={color(s.id)}
                           fillOpacity={0.16}
                           isAnimationActive={false}
                           tooltipType="none"
                           legendType="none"
-                          connectNulls
+                          type="linear"
+                          connectNulls={false}
                         />
                       ))}
                     {shownProbes.map((s) => (
@@ -479,10 +480,10 @@ export function NodeDetail({ node }: { node: Node }) {
                         key={s.id}
                         dataKey={`${smooth ? "s" : "t"}${s.id}`}
                         name={s.name}
-                        stroke={style(s.id).stroke}
-                        strokeDasharray={style(s.id).dash}
+                        stroke={color(s.id)}
                         {...SERIES}
-                        connectNulls
+                        type="linear"
+                        connectNulls={false}
                       />
                     ))}
                     {/* Drag either handle to zoom into a stretch of the trend. */}
@@ -518,15 +519,14 @@ export function NodeDetail({ node }: { node: Node }) {
                       shown ? "" : "opacity-40"
                     }`}
                   >
-                    {/* The swatch carries the same shade and dash as the line. */}
+                    {/* The swatch carries the same color as the solid line. */}
                     <svg width="14" height="6" className="shrink-0" aria-hidden>
                       <line
                         x1="0"
                         y1="3"
                         x2="14"
                         y2="3"
-                        stroke={style(s.id).stroke}
-                        strokeDasharray={style(s.id).dash}
+                        stroke={color(s.id)}
                         strokeWidth="2"
                       />
                     </svg>
