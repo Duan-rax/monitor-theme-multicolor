@@ -1,8 +1,12 @@
-# monitor-theme-default
+# monitor-theme-multicolor
 
-[monitor](https://github.com/monitor-probe/monitor) 的内置默认主题，同时作为第三方主题的参考实现。
+基于 [monitor-theme-default](https://github.com/monitor-probe/monitor-theme-default) 修改的彩色主题。
 
-React + Vite + shadcn/ui，黑白配色。
+React + Vite + shadcn/ui，在原版极简布局上为首页状态、资源占用和流量加入语义化配色。
+
+首页「剩余价值」按节点价格、计费周期与剩余天数估算未消耗价值，并通过
+[Frankfurter](https://frankfurter.dev/) 的公开汇率接口换算成人民币。汇率在浏览器缓存 12 小时；
+服务暂时不可用时使用旧缓存或显示不可用，不影响节点数据展示。
 
 ## 开发
 

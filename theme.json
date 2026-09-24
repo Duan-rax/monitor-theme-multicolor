@@ -1,8 +1,8 @@
 {
-  "name": "默认主题",
-  "short": "default",
-  "description": "内置状态面板，黑白配色",
-  "version": "1.1.0",
-  "author": "stqfdyr",
-  "url": "https://github.com/monitor-probe/monitor-theme-default"
+  "name": "Multicolor 彩色主题",
+  "short": "multicolor",
+  "description": "极简状态面板，首页指标彩色显示",
+  "version": "1.1.1",
+  "author": "Duan-rax",
+  "url": "https://github.com/Duan-rax/monitor-theme-multicolor"
 }
