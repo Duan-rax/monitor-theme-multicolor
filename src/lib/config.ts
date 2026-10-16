@@ -14,6 +14,7 @@ export type ThemeConfig = {
   lightBackgroundUrl: string
   darkBackgroundUrl: string
   backgroundBlur: number
+  backgroundPosition: "center" | "top" | "bottom" | "left" | "right"
   backgroundOverlay: number
   glassEnabled: boolean
   glassOpacity: number

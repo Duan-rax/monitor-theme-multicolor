@@ -168,8 +168,8 @@ export default function App() {
   return (
     <div className="relative isolate min-h-svh">
       <Background config={themeConfig} dark={dark} />
-      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
+      <header data-slot="site-header" className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+        <div data-slot="header-surface" className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
           {/* The site name is the way back to the list, so a node page needs
               no back button of its own. */}
           <button className="font-semibold transition-opacity hover:opacity-70" onClick={() => go(null)}>

@@ -24,6 +24,7 @@ export function Background({ config, dark }: { config: ThemeConfig; dark: boolea
           width: `calc(100% + ${bleed * 2}px)`,
           height: `calc(100% + ${bleed * 2}px)`,
           filter: config.backgroundBlur ? `blur(${config.backgroundBlur}px)` : undefined,
+          objectPosition: config.backgroundPosition,
         }}
       />
       {config.backgroundOverlay > 0 && (
