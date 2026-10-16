@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  Area, AreaChart, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Area, AreaChart, CartesianGrid, ComposedChart, Line, LineChart, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts"
 
 import { Badge } from "@/components/ui/badge"
@@ -50,6 +50,7 @@ const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: 
 // every range change, on a page meant to be read at a glance, and on the latency
 // chart across seven hundred points per probe.
 const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false }
+const PING_SERIES = { ...SERIES, strokeWidth: 0.9 }
 
 // One width for every stacked panel's value axis. Sized to their own labels --
 // 40px under "100%", 68px under "172 MB" -- the four plot areas would be offset by
@@ -130,7 +131,8 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
   const hours = ranges[tab]
   const availableRanges = historyRanges(historyDays)
   const [smooth, setSmooth] = useState(false)
-  const [pingMetric, setPingMetric] = useState<"latency" | "loss">("latency")
+  const [showLatency, setShowLatency] = useState(true)
+  const [showLoss, setShowLoss] = useState(true)
   // Probes switched off. Hiding a slow one is what makes the fast ones readable,
   // as the axis rescales to what remains.
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
@@ -309,16 +311,17 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     return Math.ceil(Math.max(100, highest) / 100) * 100
   }, [pingRows, shownProbes, smooth])
 
-  const lossTop = useMemo(() => {
-    let highest = 0
-    for (const row of pingRows) {
-      for (const series of shownProbes) {
-        const value = row[`l${series.id}`]
-        if (typeof value === "number") highest = Math.max(highest, value)
-      }
-    }
-    return axisTop(highest, 1, 10, 100)
-  }, [pingRows, shownProbes])
+  const lossMarkers = useMemo(
+    () =>
+      shownProbes.flatMap((series) =>
+        series.points.flatMap((point) =>
+          (point.loss ?? 0) > 0
+            ? [{ id: series.id, ts: point.ts * 1_000, loss: point.loss ?? 0 }]
+            : [],
+        ),
+      ),
+    [shownProbes],
+  )
 
   // A real time axis rather than the category axis recharts defaults to: on a
   // category axis ticks are selected by index, so a period the agent was offline
@@ -461,27 +464,24 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
 
             <div className="flex items-center gap-5 text-xs">
               <button
-                aria-pressed={pingMetric === "latency"}
-                onClick={() => setPingMetric("latency")}
-                className={pingMetric === "latency" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+                aria-pressed={showLatency}
+                onClick={() => setShowLatency((shown) => !shown)}
+                className={showLatency ? "text-ok" : "text-muted-foreground hover:text-foreground"}
               >
                 延迟
               </button>
               <button
-                aria-pressed={pingMetric === "loss"}
-                onClick={() => setPingMetric("loss")}
-                className={pingMetric === "loss" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+                aria-pressed={showLoss}
+                onClick={() => setShowLoss((shown) => !shown)}
+                className={showLoss ? "text-ok" : "text-muted-foreground hover:text-foreground"}
               >
                 丢包
               </button>
               <button
                 aria-pressed={smooth}
                 title="过滤短时异常尖峰，让延迟趋势更容易观察"
-                onClick={() => {
-                  setPingMetric("latency")
-                  setSmooth((enabled) => !enabled)
-                }}
-                className={smooth && pingMetric === "latency" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+                onClick={() => setSmooth((enabled) => !enabled)}
+                className={smooth ? "text-ok" : "text-muted-foreground hover:text-foreground"}
               >
                 平滑峰值
               </button>
@@ -490,38 +490,37 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
             <div className="h-80 w-full text-muted-foreground sm:h-96">
               {shownProbes.length === 0 ? (
                 <p className="py-8 text-center text-sm">没有选中任何探测</p>
+              ) : !showLatency && !showLoss ? (
+                <p className="py-8 text-center text-sm">请选择延迟或丢包</p>
               ) : (
                 <ResponsiveContainer>
                   <ComposedChart data={pingRows}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
                     <XAxis {...timeAxis(pingRows)} />
-                    {pingMetric === "latency" ? (
-                      <YAxis
-                        unit="ms"
-                        width={52}
-                        domain={[0, latencyTop]}
-                        ticks={quarters(latencyTop)}
-                        {...AXIS}
-                      />
-                    ) : (
-                      <YAxis
-                        unit="%"
-                        width={44}
-                        domain={[0, lossTop]}
-                        ticks={quarters(lossTop)}
-                        {...AXIS}
+                    <YAxis
+                      unit="ms"
+                      width={52}
+                      domain={[0, latencyTop]}
+                      ticks={quarters(latencyTop)}
+                      {...AXIS}
+                    />
+                    {showLatency && (
+                      <Tooltip
+                        labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
+                        formatter={(value, name) => [`${Math.round(Number(value))} ms`, name]}
+                        contentStyle={{ fontSize: 12 }}
                       />
                     )}
-                    <Tooltip
-                      labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
-                      formatter={(value, name) => [
-                        pingMetric === "latency"
-                          ? `${Math.round(Number(value))} ms`
-                          : `${Number(value).toFixed(Number(value) < 1 ? 2 : 1)}%`,
-                        name,
-                      ]}
-                      contentStyle={{ fontSize: 12 }}
-                    />
+                    {showLoss && lossMarkers.map((marker) => (
+                      <ReferenceLine
+                        key={`${marker.id}-${marker.ts}`}
+                        x={marker.ts}
+                        stroke={color(marker.id)}
+                        strokeWidth={0.65}
+                        strokeOpacity={Math.min(0.72, 0.2 + marker.loss / 160)}
+                        ifOverflow="hidden"
+                      />
+                    ))}
                     {/* Behind the line, the range that bucket's answers
                         spanned -- Smokeping's "smoke". At the day window a
                         bucket moves 63 ms at the 90th percentile against the
@@ -531,7 +530,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                         Only with one probe on screen: rendered for four, the
                         bands overlap into a fog and their extremes drag the
                         axis from 165-385 out to 140-420. */}
-                    {pingMetric === "latency" && shownProbes.length === 1 &&
+                    {showLatency && shownProbes.length === 1 &&
                       shownProbes.map((s) => (
                         <Area
                           key={`band${s.id}`}
@@ -546,13 +545,13 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                           connectNulls={false}
                         />
                       ))}
-                    {shownProbes.map((s) => (
+                    {showLatency && shownProbes.map((s) => (
                       <Line
                         key={s.id}
-                        dataKey={`${pingMetric === "loss" ? "l" : smooth ? "s" : "t"}${s.id}`}
+                        dataKey={`${smooth ? "s" : "t"}${s.id}`}
                         name={s.name}
                         stroke={color(s.id)}
-                        {...SERIES}
+                        {...PING_SERIES}
                         type="linear"
                         connectNulls={false}
                       />
