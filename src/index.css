@@ -54,6 +54,9 @@
      perceives. */
   --online: oklch(0.6 0.16 150);
   --offline: oklch(0.58 0.22 25);
+  --glass-opacity: 78;
+  --glass-blur: 18px;
+  --glass-saturation: 125%;
 }
 
 .dark {
@@ -148,6 +151,44 @@
      whose content exceeds the fold widens the page. */
   html { scrollbar-gutter: stable; }
   body { @apply bg-background text-foreground; }
+}
+
+/* Theme-level glass settings are applied with data attributes so the ordinary
+   opaque design remains byte-for-byte predictable when the option is off. */
+html[data-background="true"] { background-color: var(--background); }
+html[data-background="true"] body { background-color: transparent; }
+
+html[data-glass="true"] header {
+  background-color: color-mix(
+    in oklab,
+    var(--background) calc(var(--glass-opacity) * 1%),
+    transparent
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+html[data-glass="true"] [data-slot="card"] {
+  background-color: color-mix(
+    in oklab,
+    var(--card) calc(var(--glass-opacity) * 1%),
+    transparent
+  );
+  border-color: color-mix(in oklab, var(--border) 72%, transparent);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 9%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html[data-glass="true"] header,
+  html[data-glass="true"] [data-slot="card"] {
+    background-color: var(--background);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  html[data-glass="true"] [data-slot="card"] { background-color: var(--card); }
 }
 
 /* Tabular figures keep live numbers from shifting as they update. */

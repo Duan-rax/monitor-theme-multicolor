@@ -1,13 +1,21 @@
 import { lazy, Suspense, useCallback, useEffect, useState, useSyncExternalStore } from "react"
 import { Moon, Sun, Wrench } from "lucide-react"
 
+import { Background } from "@/components/Background"
 import { NodeCard } from "@/components/NodeCard"
 import { Summary } from "@/components/Summary"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api, groupsOf, useNodes, type Node } from "@/lib/api"
+import { defaultConfig, loadConfig } from "@/lib/config"
 
-type Me = { authed: boolean; github: boolean; site_name: string; public_page: boolean }
+type Me = {
+  authed: boolean
+  github: boolean
+  site_name: string
+  public_page: boolean
+  history_days?: number
+}
 
 // Split out because recharts is most of this bundle and the list page draws no
 // chart. The landing page is 242 kB rather than 629 kB (77 kB gzipped against
@@ -82,6 +90,7 @@ export default function App() {
   const [dark, toggleTheme] = useTheme()
   const [me, setMe] = useState<Me | null>(null)
   const [meError, setMeError] = useState("")
+  const [themeConfig, setThemeConfig] = useState(defaultConfig)
   const { nodes, error, closed } = useNodes()
   const [open, go] = useNodeRoute()
   // The list's group tab, held here so it survives a visit to a node's page.
@@ -98,13 +107,30 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    loadMe()
+    void loadMe()
+    void loadConfig().then(setThemeConfig)
     // Warmed here rather than left to Suspense, which requests the chunk only
     // once a render reaches the detail view, itself waiting on /me. Without this
     // the split trades its first paint for a full-page skeleton over the first
     // node opened: 2.6s click-to-chart on 4G against 1.4s unsplit, 1.7s warm.
     void loadDetail()
   }, [loadMe])
+
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.background = String(themeConfig.backgroundEnabled)
+    root.dataset.glass = String(themeConfig.glassEnabled)
+    root.style.setProperty("--glass-opacity", String(themeConfig.glassOpacity))
+    root.style.setProperty("--glass-blur", `${themeConfig.glassBlur}px`)
+    root.style.setProperty("--glass-saturation", `${themeConfig.glassSaturation}%`)
+    return () => {
+      delete root.dataset.background
+      delete root.dataset.glass
+      root.style.removeProperty("--glass-opacity")
+      root.style.removeProperty("--glass-blur")
+      root.style.removeProperty("--glass-saturation")
+    }
+  }, [themeConfig])
 
   // The status page was closed while this tab was open. `me` holds whatever it
   // reported at load, so it is re-queried; the effect below then directs an
@@ -140,7 +166,8 @@ export default function App() {
   if (!me.public_page && !me.authed) return null
 
   return (
-    <div className="min-h-svh">
+    <div className="relative isolate min-h-svh">
+      <Background config={themeConfig} dark={dark} />
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-3 sm:px-6">
           {/* The site name is the way back to the list, so a node page needs
@@ -170,7 +197,7 @@ export default function App() {
             <Skeleton className="h-96" />
           ) : selected ? (
             <Suspense fallback={<Skeleton className="h-96" />}>
-              <NodeDetail node={selected} />
+              <NodeDetail node={selected} historyDays={me.history_days ?? 7} />
             </Suspense>
           ) : (
             <p className="py-16 text-center text-sm text-muted-foreground">

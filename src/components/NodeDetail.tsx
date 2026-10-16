@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Country, Status } from "@/components/NodeCard"
 import { api, type Node } from "@/lib/api"
+import { historyRanges } from "@/lib/ranges"
 import {
   axisBytes, axisTop, bytes, clockFor, despike, quarters, cpuName, CYCLES, FOREVER, money, osName, rate,
   timeTicks,
@@ -42,18 +43,6 @@ type Probes = Record<string, string>
  * regardless of what the probe does.
  */
 type Loss = Record<string, number>
-
-const RANGES = [
-  { hours: 1, label: "1 小时" },
-  { hours: 6, label: "6 小时" },
-  { hours: 24, label: "24 小时" },
-  { hours: 168, label: "7 天" },
-]
-
-// Latency stops at a day. A week-wide bucket would still carry the spread and the
-// loss figure, but a week of probe history is outside this page's purpose, and
-// these are the windows in which every ping remains on the chart.
-const RANGES_FOR = { resources: RANGES, latency: RANGES.filter((r) => r.hours <= 24) }
 
 const AXIS = { stroke: "currentColor", fontSize: 11, tickLine: false, axisLine: false }
 
@@ -132,12 +121,13 @@ function Fact({ label, value }: { label: string; value?: string | number | null 
   )
 }
 
-export function NodeDetail({ node }: { node: Node }) {
+export function NodeDetail({ node, historyDays }: { node: Node; historyDays: number }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("resources")
   // Each tab keeps its own range: a 7-day trend and a 1-hour trace answer
   // different questions.
   const [ranges, setRanges] = useState({ resources: 6, latency: 6 })
   const hours = ranges[tab]
+  const availableRanges = historyRanges(historyDays)
   const [smooth, setSmooth] = useState(false)
   // Probes switched off. Hiding a slow one is what makes the fast ones readable,
   // as the axis rescales to what remains.
@@ -364,7 +354,7 @@ export function NodeDetail({ node }: { node: Node }) {
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex gap-1">
-            {RANGES_FOR[tab].map((r) => (
+            {availableRanges.map((r) => (
               <Tab
                 key={r.hours}
                 active={hours === r.hours}
