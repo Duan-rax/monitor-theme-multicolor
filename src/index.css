@@ -54,9 +54,6 @@
      perceives. */
   --online: oklch(0.6 0.16 150);
   --offline: oklch(0.58 0.22 25);
-  --glass-opacity: 62;
-  --glass-blur: 24px;
-  --glass-saturation: 135%;
 }
 
 .dark {
@@ -151,78 +148,6 @@
      whose content exceeds the fold widens the page. */
   html { scrollbar-gutter: stable; }
   body { @apply bg-background text-foreground; }
-}
-
-/* Theme-level glass settings are applied with data attributes so the ordinary
-   opaque design remains byte-for-byte predictable when the option is off. */
-html[data-background="true"] { background-color: var(--background); }
-html[data-background="true"] body { background-color: transparent; }
-
-html[data-glass="true"] [data-slot="site-header"] {
-  padding: 0.75rem 1rem 0;
-  border-color: transparent;
-  background-color: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-html[data-glass="true"] [data-slot="header-surface"] {
-  background-color: color-mix(
-    in oklab,
-    var(--background) calc(var(--glass-opacity) * 1%),
-    transparent
-  );
-  background-image: linear-gradient(135deg, rgb(255 255 255 / 28%), transparent 52%);
-  border: 1px solid rgb(255 255 255 / 46%);
-  border-radius: 1rem;
-  box-shadow: 0 10px 36px rgb(15 23 42 / 12%), inset 0 1px 0 rgb(255 255 255 / 52%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-html[data-glass="true"] [data-slot="card"] {
-  background-color: color-mix(
-    in oklab,
-    var(--card) calc(var(--glass-opacity) * 1%),
-    transparent
-  );
-  background-image: linear-gradient(145deg, rgb(255 255 255 / 34%), transparent 44%);
-  border-color: rgb(255 255 255 / 52%);
-  box-shadow: 0 12px 36px rgb(15 23 42 / 14%), inset 0 1px 0 rgb(255 255 255 / 58%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-html[data-glass="true"] [data-slot="card"][role="button"] {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-}
-
-html[data-glass="true"] [data-slot="card"][role="button"]:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 46px rgb(15 23 42 / 19%), inset 0 1px 0 rgb(255 255 255 / 64%);
-}
-
-.dark[data-glass="true"] [data-slot="header-surface"],
-.dark[data-glass="true"] [data-slot="card"] {
-  background-image: linear-gradient(145deg, rgb(255 255 255 / 8%), transparent 48%);
-  border-color: rgb(255 255 255 / 15%);
-  box-shadow: 0 14px 40px rgb(0 0 0 / 28%), inset 0 1px 0 rgb(255 255 255 / 12%);
-}
-
-.dark[data-glass="true"] [data-slot="card"][role="button"]:hover {
-  box-shadow: 0 20px 50px rgb(0 0 0 / 36%), inset 0 1px 0 rgb(255 255 255 / 16%);
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  html[data-glass="true"] [data-slot="header-surface"],
-  html[data-glass="true"] [data-slot="card"] {
-    background-color: var(--background);
-    background-image: none;
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-  }
-
-  html[data-glass="true"] [data-slot="card"] { background-color: var(--card); }
 }
 
 /* Tabular figures keep live numbers from shifting as they update. */

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import {
-  Area, AreaChart, Brush, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
+  Area, AreaChart, CartesianGrid, ComposedChart, Line, LineChart, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
 } from "recharts"
 
@@ -56,15 +56,16 @@ const SERIES = { dot: false as const, strokeWidth: 1.5, isAnimationActive: false
 // 28px, placing a CPU spike and the network spike that caused it at different x.
 const Y_WIDTH = 68
 
-// This theme has five distinct colours, so every probe can use a solid line.
-// Packet loss is reported separately in the legend; a dotted line must not look
-// like another loss signal.
+// Keep the common six-probe layout distinct without using dash patterns: those
+// are easily mistaken for gaps or packet loss when the lines overlap.
 const PALETTE = [
+  "var(--color-danger)",
+  "var(--color-health)",
   "var(--color-chart-1)",
-  "var(--color-chart-3)",
   "var(--color-chart-2)",
-  "var(--color-chart-4)",
+  "var(--color-chart-3)",
   "var(--color-chart-5)",
+  "var(--color-chart-4)",
 ]
 
 const TABS = [
@@ -129,6 +130,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
   const hours = ranges[tab]
   const availableRanges = historyRanges(historyDays)
   const [smooth, setSmooth] = useState(false)
+  const [pingMetric, setPingMetric] = useState<"latency" | "loss">("latency")
   // Probes switched off. Hiding a slow one is what makes the fast ones readable,
   // as the axis rescales to what remains.
   const [hiddenProbes, setHiddenProbes] = useState<number[]>([])
@@ -139,11 +141,6 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
   // the connection the agents report through. Rendered as an empty window, a 503
   // would misdirect the reader.
   const [failed, setFailed] = useState("")
-  // Where the brush has been dragged, so the axis reticks for the visible span
-  // rather than retaining the whole window's ticks.
-  const [zoom, setZoom] = useState<[number, number] | null>(null)
-  // Where the chart begins on screen, so its height can occupy the remainder.
-  const [chartTop, setChartTop] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -151,8 +148,6 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     // flight.
     // oxlint-disable-next-line react/set-state-in-effect
     setData(null)
-    // oxlint-disable-next-line react/set-state-in-effect
-    setZoom(null)
     // oxlint-disable-next-line react/set-state-in-effect
     setFailed("")
     // What this screen can resolve, in device pixels, which is the unit the line
@@ -229,6 +224,26 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     () => pingSeries.filter((s) => !hiddenProbes.includes(s.id)),
     [pingSeries, hiddenProbes],
   )
+  const probeStats = useMemo(
+    () =>
+      pingSeries.map((series) => {
+        const answered = series.points.flatMap((point) =>
+          point.latency === null ? [] : [point.latency],
+        )
+        const peaks = series.points.flatMap((point) => {
+          if (point.band) return [point.band[1]]
+          return point.latency === null ? [] : [point.latency]
+        })
+        return {
+          ...series,
+          average: answered.length
+            ? Math.round(answered.reduce((sum, value) => sum + value, 0) / answered.length)
+            : null,
+          peak: peaks.length ? Math.round(Math.max(...peaks)) : null,
+        }
+      }),
+    [pingSeries],
+  )
   // Keyed on the full list, so a line keeps its shade when others are hidden.
   const color = (id: number) => PALETTE[pingSeries.findIndex((probe) => probe.id === id) % PALETTE.length]
 
@@ -282,6 +297,28 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
     }
     return [...rows.values()].sort((a, b) => a.ts - b.ts)
   }, [pingSeries])
+
+  const latencyTop = useMemo(() => {
+    let highest = 0
+    for (const row of pingRows) {
+      for (const series of shownProbes) {
+        const value = row[`${smooth ? "s" : "t"}${series.id}`]
+        if (typeof value === "number") highest = Math.max(highest, value)
+      }
+    }
+    return Math.ceil(Math.max(100, highest) / 100) * 100
+  }, [pingRows, shownProbes, smooth])
+
+  const lossTop = useMemo(() => {
+    let highest = 0
+    for (const row of pingRows) {
+      for (const series of shownProbes) {
+        const value = row[`l${series.id}`]
+        if (typeof value === "number") highest = Math.max(highest, value)
+      }
+    }
+    return axisTop(highest, 1, 10, 100)
+  }, [pingRows, shownProbes])
 
   // A real time axis rather than the category axis recharts defaults to: on a
   // category axis ticks are selected by index, so a period the agent was offline
@@ -364,17 +401,6 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
               </Tab>
             ))}
           </div>
-          {tab === "latency" && (
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={smooth}
-                onChange={(e) => setSmooth(e.target.checked)}
-                className="accent-foreground"
-              />
-              削峰
-            </label>
-          )}
         </div>
       </div>
 
@@ -386,59 +412,114 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
         pingSeries.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">这段时间没有延迟数据</p>
         ) : (
-          // An explicit pixel height on the column, so the chart can be `flex-1`
-          // within it while the legend takes what it needs: four probes are one row
-          // of chips on a desktop and two on a phone, so any fixed reservation is
-          // wrong on one of them.
-          <div
-            // `+ scrollY`, because getBoundingClientRect is measured from the
-            // viewport and this callback runs on every render; a live node
-            // re-renders every two seconds, so a scrolled page would re-derive the
-            // height from a top that has moved.
-            ref={(el) => {
-              if (el) setChartTop(el.getBoundingClientRect().top + scrollY)
-            }}
-            style={
-              chartTop
-                ? { height: `calc(100svh - ${Math.round(chartTop)}px - 1rem)` }
-                : undefined
-            }
-            className="flex min-h-72 flex-col gap-3">
-            {/* `min-h-0` is what makes `flex-1` a real number rather than the
-                content's own height: ResponsiveContainer reads its parent, and
-                a flex child not told it may shrink reports whatever the SVG
-                last was. The column above has a height in pixels, so this
-                resolves at layout instead of coming back 0. */}
-            <div className="min-h-0 w-full flex-1 text-muted-foreground">
+          <div className="space-y-5">
+            <div className="flex justify-end gap-4 text-xs">
+              <button
+                className="text-ok transition-opacity hover:opacity-70"
+                onClick={() => setHiddenProbes([])}
+              >
+                全选
+              </button>
+              <button
+                className="text-muted-foreground transition-opacity hover:text-foreground"
+                onClick={() => setHiddenProbes(pingSeries.map((series) => series.id))}
+              >
+                全不选
+              </button>
+            </div>
+
+            <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {probeStats.map((series) => {
+                const shown = !hiddenProbes.includes(series.id)
+                const loss = series.loss < 1 ? series.loss.toFixed(2) : series.loss.toFixed(1)
+                return (
+                  <button
+                    key={series.id}
+                    aria-pressed={shown}
+                    onClick={() =>
+                      setHiddenProbes((hidden) =>
+                        shown ? [...hidden, series.id] : hidden.filter((id) => id !== series.id),
+                      )
+                    }
+                    className={`min-w-0 text-left transition-opacity ${shown ? "" : "opacity-35"}`}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-5 w-1 shrink-0 rounded-full"
+                        style={{ backgroundColor: color(series.id) }}
+                        aria-hidden
+                      />
+                      <strong className="truncate text-sm font-medium text-foreground">{series.name}</strong>
+                    </span>
+                    <span className="mt-1 block truncate pl-3 text-xs tabular-nums text-muted-foreground">
+                      {series.average ?? "—"} ms · 丢 {loss}% · 峰 {series.peak ?? "—"} ms
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-5 text-xs">
+              <button
+                aria-pressed={pingMetric === "latency"}
+                onClick={() => setPingMetric("latency")}
+                className={pingMetric === "latency" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+              >
+                延迟
+              </button>
+              <button
+                aria-pressed={pingMetric === "loss"}
+                onClick={() => setPingMetric("loss")}
+                className={pingMetric === "loss" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+              >
+                丢包
+              </button>
+              <button
+                aria-pressed={smooth}
+                title="过滤短时异常尖峰，让延迟趋势更容易观察"
+                onClick={() => {
+                  setPingMetric("latency")
+                  setSmooth((enabled) => !enabled)
+                }}
+                className={smooth && pingMetric === "latency" ? "text-ok" : "text-muted-foreground hover:text-foreground"}
+              >
+                平滑峰值
+              </button>
+            </div>
+
+            <div className="h-80 w-full text-muted-foreground sm:h-96">
               {shownProbes.length === 0 ? (
                 <p className="py-8 text-center text-sm">没有选中任何探测</p>
               ) : (
                 <ResponsiveContainer>
                   <ComposedChart data={pingRows}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-                    <XAxis
-                      {...timeAxis(
-                        pingRows,
-                        Math.min(zoom?.[0] ?? 0, pingRows.length - 1),
-                        Math.min(zoom?.[1] ?? pingRows.length - 1, pingRows.length - 1),
-                      )}
-                    />
-                    {/* Not anchored at zero: these lines live in a narrow band
-                        far from it, and zero flattens every wobble. */}
-                    <YAxis unit="ms" width={52} domain={["auto", "auto"]} {...AXIS} />
+                    <XAxis {...timeAxis(pingRows)} />
+                    {pingMetric === "latency" ? (
+                      <YAxis
+                        unit="ms"
+                        width={52}
+                        domain={[0, latencyTop]}
+                        ticks={quarters(latencyTop)}
+                        {...AXIS}
+                      />
+                    ) : (
+                      <YAxis
+                        unit="%"
+                        width={44}
+                        domain={[0, lossTop]}
+                        ticks={quarters(lossTop)}
+                        {...AXIS}
+                      />
+                    )}
                     <Tooltip
                       labelFormatter={(ts) => new Date(Number(ts)).toLocaleString("zh-CN")}
-                      // The line is drawn from what answered, so without this a
-                      // bucket that lost most of its packets reads as normal.
-                      // `dataKey` is `t7`/`s7`; the loss sits at `l7`.
-                      //
-                      // Rounded because a clipped sample carries the median of
-                      // an even window, which falls between two of the whole
-                      // milliseconds the hub stores.
-                      formatter={(v, name, item) => {
-                        const loss = Number(item?.payload?.[`l${String(item.dataKey).slice(1)}`] ?? 0)
-                        return [`${Math.round(Number(v))} ms${loss > 0 ? ` · 丢 ${loss}%` : ""}`, name]
-                      }}
+                      formatter={(value, name) => [
+                        pingMetric === "latency"
+                          ? `${Math.round(Number(value))} ms`
+                          : `${Number(value).toFixed(Number(value) < 1 ? 2 : 1)}%`,
+                        name,
+                      ]}
                       contentStyle={{ fontSize: 12 }}
                     />
                     {/* Behind the line, the range that bucket's answers
@@ -450,7 +531,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                         Only with one probe on screen: rendered for four, the
                         bands overlap into a fog and their extremes drag the
                         axis from 165-385 out to 140-420. */}
-                    {shownProbes.length === 1 &&
+                    {pingMetric === "latency" && shownProbes.length === 1 &&
                       shownProbes.map((s) => (
                         <Area
                           key={`band${s.id}`}
@@ -468,7 +549,7 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                     {shownProbes.map((s) => (
                       <Line
                         key={s.id}
-                        dataKey={`${smooth ? "s" : "t"}${s.id}`}
+                        dataKey={`${pingMetric === "loss" ? "l" : smooth ? "s" : "t"}${s.id}`}
                         name={s.name}
                         stroke={color(s.id)}
                         {...SERIES}
@@ -476,63 +557,10 @@ export function NodeDetail({ node, historyDays }: { node: Node; historyDays: num
                         connectNulls={false}
                       />
                     ))}
-                    {/* Drag either handle to zoom into a stretch of the trend. */}
-                    <Brush
-                      dataKey="ts"
-                      height={22}
-                      travellerWidth={8}
-                      tickFormatter={clockFor(hours)}
-                      className="fill-muted"
-                      stroke="var(--color-muted-foreground)"
-                      onChange={(r) => setZoom([r.startIndex ?? 0, r.endIndex ?? pingRows.length - 1])}
-                    />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
             </div>
-
-            {/* Under the chart: what it covers is picked at the top, what is
-                drawn in it is picked here. Recharts paints the brush into the
-                same SVG as the axis, so this is as close beneath as HTML
-                sits. */}
-            {(pingSeries.length > 1 || pingSeries.some((s) => s.loss > 0)) && (
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              {pingSeries.map((s) => {
-                const shown = !hiddenProbes.includes(s.id)
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() =>
-                      setHiddenProbes((h) => (shown ? [...h, s.id] : h.filter((id) => id !== s.id)))
-                    }
-                    className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-opacity ${
-                      shown ? "" : "opacity-40"
-                    }`}
-                  >
-                    {/* The swatch carries the same color as the solid line. */}
-                    <svg width="14" height="6" className="shrink-0" aria-hidden>
-                      <line
-                        x1="0"
-                        y1="3"
-                        x2="14"
-                        y2="3"
-                        stroke={color(s.id)}
-                        strokeWidth="2"
-                      />
-                    </svg>
-                    {s.name}
-                    {/* The line is only what answered, so a probe dropping
-                        half its packets draws like a healthy one. */}
-                    {s.loss > 0 && (
-                      <span className="tabular-nums opacity-60">
-                        丢 {s.loss < 1 ? "<1" : Math.round(s.loss)}%
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            )}
           </div>
         )
       ) : data.metrics.length === 0 ? (
